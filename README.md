@@ -18,5 +18,6 @@ they never upload anything.
 | Project | Script |
 |---|---|
 | Retail Revenue Intelligence | [`retail-revenue-intelligence/checkpoint.py`](retail-revenue-intelligence/checkpoint.py) |
+| Blinkit Warehouse Pipeline (Snowflake + dbt) | [`blinkit-dbt-pipeline/checkpoint.py`](blinkit-dbt-pipeline/checkpoint.py) |
 
 More projects arrive as their curricula go live. Found a problem? PRs welcome.
