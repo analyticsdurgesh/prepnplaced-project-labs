@@ -434,7 +434,9 @@ def ci_build_it(report: Report) -> None:
     unique_key = config.get("unique_key")
     keys = [unique_key] if isinstance(unique_key, str) else list(unique_key or [])
     report.check(config.get("materialized") == "incremental", "fct_reviews is materialized as incremental")
-    report.check([k.lower() for k in keys] == ["review_id"], f"fct_reviews has unique_key review_id (found {unique_key!r})")
+    report.check([k.lower() for k in keys] == ["review_id"],
+                 "fct_reviews has unique_key review_id" + ("" if [k.lower() for k in keys] == ["review_id"]
+                                                          else f" (yours: {', '.join(keys) or 'not set yet'})"))
     if config.get("materialized") != "incremental":
         return
     box = Sandbox()
@@ -495,8 +497,9 @@ def ci_break_it(report: Report) -> None:
         distinct_days = box.scalar("select count(*) from (select distinct listing_id, date from raw.calendar)")
         code, _ = box.dbt("build", "--full-refresh")
         fact = box.scalar("select count(*) from analytics.fct_listing_calendar") if code == 0 else None
+        seen = "the build failed with the duplicates in RAW" if fact is None else f"{fact:,} rows vs {distinct_days:,} listing-days"
         report.check(code == 0 and fact == distinct_days,
-                     f"incident 1 (duplicate calendar days): the build passes and keeps one row per listing-day ({fact} vs {distinct_days:,})")
+                     f"incident 1 (duplicate calendar days): the build passes and keeps one row per listing-day ({seen})")
     finally:
         box.close()
     # Incident 2: prices arrive as '$1.234,50' for a third of the listings.
@@ -679,7 +682,13 @@ def main() -> int:
     if len(args) == 2 and args[0] == "ci" and args[1] in CI_CHECKS:
         report = Report(args[1])
         print(f"PrepNPlaced Lab check: {args[1]}", flush=True)
-        CI_CHECKS[args[1]](report)
+        try:
+            CI_CHECKS[args[1]](report)
+        except Exception as error:  # noqa: BLE001 — a model that failed to build must read as a red line, not a traceback
+            first = (str(error).strip().splitlines() or [type(error).__name__])[0][:240]
+            report.check(False, f"this check could not finish: {first}")
+            print("    Usually a model of yours did not build. Open the 'Load RAW and build' step above, fix the first"
+                  " red model it lists, push, and this check runs again.", flush=True)
         print(f"\n{'PASS' if report.ok else 'FAIL'}: {args[1]}", flush=True)
         return 0 if report.ok else 1
     if len(args) == 2 and args[0] == "drill" and (args[1] in DRILLS or args[1] == "reset"):
