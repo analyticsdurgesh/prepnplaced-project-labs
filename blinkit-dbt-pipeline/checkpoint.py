@@ -43,6 +43,13 @@ MARKERS = [
 
 DATASET = "data/blinkit_orders.csv"
 
+# Windows sends redirected output through cp1252, which has no ✓ or ✗: print UTF-8 everywhere instead.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+    except (AttributeError, ValueError):
+        pass
+
 CANONICAL_COLUMNS = [
     "ITEM FAT CONTENT",
     "ITEM IDENTIFIER",

@@ -22,12 +22,26 @@ import sys
 from pathlib import Path
 
 ROOT = Path.cwd()
+
+# Windows sends redirected output through cp1252, which has no ✓ or ✗: print UTF-8 everywhere instead.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+    except (AttributeError, ValueError):
+        pass
 MARKERS = ["src/download_data.py", "dashboard/app.py"]
 
 
 def _fail(msg: str) -> None:
     print(f"\n  ✗ {msg}\n")
     sys.exit(1)
+
+
+def _mark(value: object) -> str:
+    """✗ only for something missing. A count of 0 is a real answer (no nulls left is exactly what a clean
+    table should show), so it gets a tick; -1 means the column was not found."""
+    missing = value is None or value is False or value == -1 or value in ("", [], {})
+    return "✗" if missing else "✓"
 
 
 def _sha256_prefix(path: Path, chars: int = 16) -> str:
@@ -140,7 +154,8 @@ def mode_clean() -> dict:
 def mode_sql() -> dict:
     queries = {}
     for name in ("monthly_revenue", "top_countries", "top_products"):
-        path = _first_existing(f"outputs/sql/{name}.csv", f"outputs/{name}.csv")
+        # src/sql_analysis.py writes outputs/sql_results/; the other two are older layouts, still accepted.
+        path = _first_existing(f"outputs/sql_results/{name}.csv", f"outputs/sql/{name}.csv", f"outputs/{name}.csv")
         if path is None:
             _fail(f"{name}.csv not found under outputs/ — run the SQL analysis step first.")
         rows = max(0, sum(1 for _ in open(path, "r", encoding="utf-8", errors="replace")) - 1)
@@ -179,7 +194,7 @@ def main() -> None:
     print("===== PREPNPLACED CHECKPOINT =====")
     print(json.dumps(payload, indent=2))
     print("===== END =====")
-    checks = [f"  {'✓' if bool(v) else '✗'} {k}: {v}" for k, v in block.items()]
+    checks = [f"  {_mark(v)} {k}: {v}" for k, v in block.items()]
     print("\n".join(checks))
     print("\nCopy everything between the ===== lines into the checkpoint box on the site.")
 
