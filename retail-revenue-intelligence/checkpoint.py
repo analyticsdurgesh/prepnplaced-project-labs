@@ -63,9 +63,19 @@ def mode_env() -> dict:
         requirements_ok = True
     except ImportError:
         requirements_ok = False
+    in_venv = sys.prefix != getattr(sys, "base_prefix", sys.prefix)
+    # A GitHub Codespace or a dev container is already an isolated environment
+    # (the container is the clean room), so it counts as much as a venv does.
+    if os.environ.get("CODESPACES") == "true":
+        environment = "codespace"
+    elif os.environ.get("REMOTE_CONTAINERS") == "true" or os.environ.get("DEVCONTAINER") == "true":
+        environment = "dev container"
+    else:
+        environment = "venv" if in_venv else "system python"
     return {
         "python": ".".join(map(str, sys.version_info[:3])),
-        "venv_active": sys.prefix != getattr(sys, "base_prefix", sys.prefix),
+        "venv_active": environment != "system python",
+        "environment": environment,
         "git_configured": git_ok,
         "repo": "retail-revenue-intelligence",
         "requirements_installed": requirements_ok,
